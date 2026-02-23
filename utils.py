@@ -1,19 +1,20 @@
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram import types
 
-def main_reply_keyboard(lang="bn"):
-    buttons = [
-        ["Balance", "Referral"],
-        ["Bot Info", "Help"],
-        ["Ask AI", "Language"],
-        ["Total Users", "Get Account"]
-    ]
-    kb = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    for row in buttons:
-        kb.row(*[KeyboardButton(text=b) for b in row])
+
+def main_reply_keyboard(lang: str = "bn") -> types.ReplyKeyboardMarkup:
+    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    kb.add(types.KeyboardButton("Get Account"))
+    kb.add(types.KeyboardButton("Balance"), types.KeyboardButton("Referral"))
+    kb.add(types.KeyboardButton("Bot Info"), types.KeyboardButton("Help"))
+    kb.add(types.KeyboardButton("Total Users"))
+    kb.add(types.KeyboardButton("Ask AI"), types.KeyboardButton("Language"))
     return kb
 
-def verify_inline_kb(account_obj_id: str):
-    kb = InlineKeyboardMarkup()
-    kb.add(InlineKeyboardButton("✅ Working", callback_data=f"verify:working:{account_obj_id}"))
-    kb.add(InlineKeyboardButton("❌ Not Working", callback_data=f"verify:notworking:{account_obj_id}"))
+
+def verify_inline_kb(account_id: str) -> types.InlineKeyboardMarkup:
+    kb = types.InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        types.InlineKeyboardButton("✅ Working", callback_data=f"verify:working:{account_id}"),
+        types.InlineKeyboardButton("❌ Not Working", callback_data=f"verify:notworking:{account_id}"),
+    )
     return kb
