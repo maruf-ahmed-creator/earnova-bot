@@ -5,7 +5,7 @@ from aiogram.enums import ParseMode
 from config import settings
 from db import ensure_indexes
 from user import router as user_router
-from handlers.admin import router as admin_router
+from admin import router as admin_router
 from workers.scheduler import proof_timeout_worker, referral_leave_worker, broadcast_worker
 
 log = logging.getLogger("earnova")
