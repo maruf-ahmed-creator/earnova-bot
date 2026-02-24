@@ -14,9 +14,9 @@ from db import (
     upsert_user, get_user, referral_counts, claim_resource_for_user, decrypt_secret,
     inc_accounts_taken, create_pending_proof, attach_proof_file, db, set_user_lang
 )
-from services.join_gate import check_user_joined, current_required_version
-from services.rate_limit import allow
-from services.ai import ask_ai
+from join_gate import check_user_joined, current_required_version
+from rate_limit import allow
+from ai import ask_ai
 
 router = Router()
 
