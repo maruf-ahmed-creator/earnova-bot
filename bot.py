@@ -1,17 +1,18 @@
 import logging
 from aiogram import Bot, Dispatcher
+from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 from config import settings
 from db import ensure_indexes
 from user import router as user_router
 from admin import router as admin_router
-from scheduler import proof_timeout_worker, referral_leave_worker, broadcast_worker
+from workers.scheduler import proof_timeout_worker, referral_leave_worker, broadcast_worker
 
 log = logging.getLogger("earnova")
 
 async def build_bot_and_dp():
-    bot = Bot(token=settings.BOT_TOKEN, parse_mode=ParseMode.HTML)
+    bot = Bot(token=settings.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher()
     dp.include_router(admin_router)
     dp.include_router(user_router)
