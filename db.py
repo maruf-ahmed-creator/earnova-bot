@@ -84,3 +84,11 @@ async def inc_referral(referrer_id: int):
         },
         upsert=True,
     )
+
+
+async def referral_counts(user_id: int) -> int:
+    """Return the number of successful referrals for a user."""
+    user = await get_user(user_id)
+    return int(user.get("referral_count", 0)) if user else 0
+    # বা চাইলে referrals কালেকশন থেকে কন্ট করতে পারো:
+    # return await db.referrals.count_documents({"referrer_id": int(user_id)})
