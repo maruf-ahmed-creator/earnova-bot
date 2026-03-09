@@ -2,36 +2,45 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import List, Optional
+from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorClient
+from cryptography.fernet import Fernet
 
 from config import settings
 
-# Mongo client
 client = AsyncIOMotorClient(settings.MONGO_URI)
 db = client.get_default_database()
 
+_fernet = Fernet(settings.ENCRYPTION_KEY.encode() if isinstance(settings.ENCRYPTION_KEY, str) else settings.ENCRYPTION_KEY)
+
 
 async def ensure_indexes():
-    """
-    Optional: indexes create (safe). Call at startup if you want.
-    """
     try:
         await db.users.create_index("user_id", unique=True)
         await db.users.create_index("referrer_id")
         await db.users.create_index("last_active")
+        await db.resources.create_index("status")
+        await db.proofs.create_index([("user_id", 1), ("status", 1)])
+        await db.proofs.create_index("deadline")
+        await db.channels.create_index("channel_id", unique=True)
     except Exception:
-        # index already exists or no permission—ignore
         pass
 
 
-async def upsert_user(user_id: int, username: str | None, referrer_id: int | None = None):
-    """
-    Fix: last_active conflict remove করা হয়েছে ✅
-    - last_active শুধু $set এ থাকবে
-    - created_at শুধু $setOnInsert এ থাকবে
-    """
-    now = datetime.utcnow()
+def encrypt_secret(plain: str) -> str:
+    return _fernet.encrypt(plain.encode()).decode()
 
+
+def decrypt_secret(token: str) -> str:
+    try:
+        return _fernet.decrypt(token.encode()).decode()
+    except Exception:
+        return "(decryption error)"
+
+
+async def upsert_user(user_id: int, username: str | None, referrer_id: int | None = None):
+    now = datetime.utcnow()
     update_doc = {
         "$set": {
             "username": username,
@@ -42,11 +51,8 @@ async def upsert_user(user_id: int, username: str | None, referrer_id: int | Non
             "created_at": now,
         },
     }
-
-    # referrer_id only on first insert
     if referrer_id:
         update_doc["$setOnInsert"]["referrer_id"] = referrer_id
-
     await db.users.update_one({"user_id": user_id}, update_doc, upsert=True)
 
 
@@ -60,6 +66,10 @@ async def set_language(user_id: int, lang: str):
         {"$set": {"language": lang, "last_active": datetime.utcnow()}},
         upsert=True,
     )
+
+
+async def set_user_lang(user_id: int, lang: str):
+    await set_language(user_id, lang)
 
 
 async def add_balance(user_id: int, amount: int):
@@ -87,8 +97,160 @@ async def inc_referral(referrer_id: int):
 
 
 async def referral_counts(user_id: int) -> int:
-    """Return the number of successful referrals for a user."""
     user = await get_user(user_id)
     return int(user.get("referral_count", 0)) if user else 0
-    # বা চাইলে referrals কালেকশন থেকে কন্ট করতে পারো:
-    # return await db.referrals.count_documents({"referrer_id": int(user_id)})
+
+
+async def inc_points(user_id: int, delta: int):
+    await db.users.update_one(
+        {"user_id": user_id},
+        {
+            "$inc": {"points": delta},
+            "$set": {"last_active": datetime.utcnow()},
+            "$setOnInsert": {"created_at": datetime.utcnow(), "user_id": user_id},
+        },
+        upsert=True,
+    )
+
+
+async def set_banned(user_id: int, banned: bool):
+    await db.users.update_one(
+        {"user_id": user_id},
+        {"$set": {"banned": banned, "last_active": datetime.utcnow()}},
+        upsert=True,
+    )
+
+
+async def inc_accounts_taken(user_id: int, delta: int = 1):
+    await db.users.update_one(
+        {"user_id": user_id},
+        {"$inc": {"accounts_taken": delta}, "$set": {"last_active": datetime.utcnow()}},
+    )
+
+
+async def add_channel(channel_id: int, ch_type: str):
+    now = datetime.utcnow()
+    await db.channels.update_one(
+        {"channel_id": channel_id},
+        {"$set": {"channel_id": channel_id, "type": ch_type, "updated_at": now},
+         "$setOnInsert": {"created_at": now}},
+        upsert=True,
+    )
+    await _bump_required_version()
+
+
+async def remove_channel(channel_id: int):
+    await db.channels.delete_one({"channel_id": channel_id})
+    await _bump_required_version()
+
+
+async def list_channels() -> List[dict]:
+    cursor = db.channels.find({})
+    return await cursor.to_list(length=None)
+
+
+async def _bump_required_version():
+    now = int(datetime.utcnow().timestamp())
+    await db.config.update_one(
+        {"key": "required_version"},
+        {"$set": {"value": now}},
+        upsert=True,
+    )
+
+
+async def get_required_version() -> int:
+    doc = await db.config.find_one({"key": "required_version"})
+    if doc:
+        return int(doc.get("value", 1))
+    return 1
+
+
+async def add_resource(name: str, secret_plain: str, cost: int = 0, default_flag: bool = False) -> ObjectId:
+    encrypted = encrypt_secret(secret_plain)
+    doc = {
+        "name": name,
+        "secret": encrypted,
+        "cost": cost,
+        "default_flag": default_flag,
+        "status": "available",
+        "created_at": datetime.utcnow(),
+    }
+    result = await db.resources.insert_one(doc)
+    return result.inserted_id
+
+
+async def remove_resource(resource_id: str) -> bool:
+    try:
+        oid = ObjectId(resource_id)
+    except Exception:
+        return False
+    result = await db.resources.delete_one({"_id": oid})
+    return result.deleted_count > 0
+
+
+async def list_resources(limit: int = 30) -> List[dict]:
+    cursor = db.resources.find({}).sort("created_at", -1).limit(limit)
+    return await cursor.to_list(length=limit)
+
+
+async def claim_resource_for_user(user_id: int) -> Optional[dict]:
+    now = datetime.utcnow()
+    resource = await db.resources.find_one_and_update(
+        {"status": "available"},
+        {"$set": {"status": "assigned", "assigned_to": user_id, "assigned_at": now}},
+        return_document=True,
+    )
+    return resource
+
+
+async def create_pending_proof(user_id: int, resource_id: str, status: str, deadline: datetime):
+    await db.proofs.insert_one({
+        "user_id": user_id,
+        "resource_id": resource_id,
+        "status": status,
+        "type": None,
+        "file_id": None,
+        "deadline": deadline,
+        "created_at": datetime.utcnow(),
+        "posted": [],
+    })
+
+
+async def attach_proof_file(user_id: int, file_id: str) -> Optional[dict]:
+    proof = await db.proofs.find_one_and_update(
+        {"user_id": user_id, "status": "pending"},
+        {"$set": {"file_id": file_id, "status": "submitted", "submitted_at": datetime.utcnow()}},
+        sort=[("created_at", -1)],
+        return_document=True,
+    )
+    return proof
+
+
+async def pending_proofs_due(now: datetime, limit: int = 200) -> List[dict]:
+    cursor = db.proofs.find({"status": "pending", "deadline": {"$lte": now}}).limit(limit)
+    return await cursor.to_list(length=limit)
+
+
+async def expire_proof(proof_id: ObjectId):
+    await db.proofs.update_one(
+        {"_id": proof_id},
+        {"$set": {"status": "expired", "expired_at": datetime.utcnow()}},
+    )
+
+
+async def mark_referred_left(referred_id: int):
+    now = datetime.utcnow()
+    referral = await db.referrals.find_one({"referred_id": referred_id, "left_at": None})
+    if not referral:
+        return
+    await db.referrals.update_one(
+        {"_id": referral["_id"]},
+        {"$set": {"left_at": now}},
+    )
+    referrer_id = referral.get("referrer_id")
+    if referrer_id:
+        pts = int(referral.get("points_awarded", 10))
+        await db.users.update_one(
+            {"user_id": int(referrer_id)},
+            {"$inc": {"points": -pts}},
+        )
