@@ -3,6 +3,13 @@ from fastapi import FastAPI, Request
 from aiogram.types import Update
 from config import settings
 from bot import build_bot_and_dp, start_background_workers
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/")
+async def root():
+    return {"message": "Bot is running"}
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("earnova")
