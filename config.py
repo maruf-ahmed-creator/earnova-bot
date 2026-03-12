@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     BOT_TOKEN: str
-    WEBHOOK_BASE: str  # https://your-domain
+    WEBHOOK_BASE: Optional[str] = None
     MONGO_URI: str
     ENCRYPTION_KEY: str
 
@@ -20,10 +20,16 @@ class Settings(BaseSettings):
     REDIS_URL: Optional[str] = None
     OPENAI_API_KEY: Optional[str] = None
 
+    REPLIT_DEV_DOMAIN: Optional[str] = None
+
     @field_validator("WEBHOOK_BASE")
     @classmethod
     def _strip_slash(cls, v: str):
-        return v.rstrip("/")
+        if v is None:
+            return v
+        from urllib.parse import urlparse
+        parsed = urlparse(v)
+        return f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
 
     def admin_id_set(self) -> Set[int]:
         ids = set()
