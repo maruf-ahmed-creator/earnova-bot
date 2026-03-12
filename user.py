@@ -239,7 +239,7 @@ async def any_text(m: Message, bot: Bot):
         lang = user.get("language", "bn") if user else "bn"
         ans = await ask_ai(m.text, lang=lang)
         await db.ai_logs.insert_one({"user_id": int(m.from_user.id), "lang": lang, "q": m.text, "a": ans, "ts": datetime.utcnow()})
-        await m.answer(ans)
+        await m.answer(ans, parse_mode=None)
         return
 
     if (m.text or "").strip() in {BTN_BALANCE, BTN_REFERRAL, BTN_INFO, BTN_HELP, BTN_AI, BTN_LANG, BTN_TOTAL, BTN_GET}:

@@ -1,0 +1,60 @@
+Act as a senior Python, FastAPI, Telegram Bot, Replit, and MongoDB debugging expert.
+
+I have a Telegram bot running on Replit using FastAPI and Uvicorn. The bot is deployed and the webhook is connected, but I am facing multiple serious issues.
+
+My current problems are:
+
+1. The bot takes a very long time to start, sometimes around 10 minutes.
+2. Sometimes the bot does not start at all.
+3. Sometimes the bot starts, but it does not reply to Telegram messages.
+4. Sometimes the bot becomes unresponsive or misses replies.
+5. I cannot access the admin panel.
+6. The language feature probably does not work correctly.
+7. The bot may have other hidden bugs, errors, route problems, configuration issues, or logic issues.
+8. I want all current problems and errors fully diagnosed and fixed.
+
+Project details:
+- Platform: Replit
+- Framework: FastAPI
+- Server: Uvicorn
+- Type: Telegram webhook bot
+- Possible secrets/environment variables: BOT_TOKEN, WEBHOOK_BASE, ADMIN_IDS, MONGO_URI, SESSION_SECRET
+- The bot has already shown logs like:
+  - Started server process
+  - Waiting for application startup
+  - Application startup complete
+  - Webhook set
+
+But even after startup, the bot is not fully stable.
+
+Your task:
+1. Fully inspect the whole codebase and identify every important problem.
+2. Explain clearly what each problem is.
+3. Explain why each problem is happening.
+4. Fix all problems one by one.
+5. Show the exact corrected code.
+6. Show what files and what lines should be changed.
+7. Fix the webhook configuration if needed.
+8. Fix admin panel access if broken.
+9. Fix Telegram reply issues.
+10. Fix startup delay issues.
+11. Fix language feature issues.
+12. Fix route mismatches and secret/config mistakes.
+13. Point out any duplicate secret, broken route, wrong URL, bad startup logic, blocking code, or bad async/sync handling.
+14. Show step-by-step Replit instructions to apply the fixes.
+15. Give me the final working version approach.
+
+Important instructions:
+- Do not give vague advice.
+- Do not only explain theory.
+- I want exact diagnosis and exact fixes.
+- If there are multiple possible causes, rank them by most likely first.
+- Show a minimum working correct FastAPI Telegram webhook example if necessary.
+- If an admin panel does not exist, clearly say that.
+- If the admin panel route exists, tell me exactly how to access it.
+- If there are startup performance problems, explain the exact cause and fix.
+- If there are message reply issues, explain exactly why and fix them.
+- If the language system is broken, identify where and how to fix it.
+- At the end, give me a checklist of all fixes applied.
+
+Please behave like a real senior debugger and solve the problems practically, not theoretically.

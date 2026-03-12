@@ -55,6 +55,9 @@ async def set_webhook():
 @app.post(WEBHOOK_PATH)
 async def telegram_webhook(req: Request):
     global dp, bot
-    update = Update.model_validate(await req.json())
-    await dp.feed_update(bot, update)
+    try:
+        update = Update.model_validate(await req.json())
+        await dp.feed_update(bot, update)
+    except Exception as e:
+        log.exception(f"Error processing update: {e}")
     return {"ok": True}
