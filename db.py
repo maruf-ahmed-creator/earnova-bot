@@ -1,13 +1,17 @@
 # db.py
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from typing import List, Optional
 from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorClient
 from cryptography.fernet import Fernet
+from pymongo import ReturnDocument
 
 from config import settings
+
+log = logging.getLogger("earnova")
 
 client = AsyncIOMotorClient(settings.MONGO_URI)
 db = client.get_default_database()
@@ -193,13 +197,22 @@ async def list_resources(limit: int = 30) -> List[dict]:
     return await cursor.to_list(length=limit)
 
 
+async def count_available_resources() -> int:
+    return await db.resources.count_documents({"status": "available"})
+
+
 async def claim_resource_for_user(user_id: int) -> Optional[dict]:
     now = datetime.utcnow()
+    avail = await db.resources.count_documents({"status": "available"})
+    log.info(f"claim_resource_for_user: user={user_id}, available_count={avail}")
+    if avail == 0:
+        return None
     resource = await db.resources.find_one_and_update(
         {"status": "available"},
         {"$set": {"status": "assigned", "assigned_to": user_id, "assigned_at": now}},
-        return_document=True,
+        return_document=ReturnDocument.AFTER,
     )
+    log.info(f"claim_resource_for_user: result={'found' if resource else 'None'} id={resource.get('_id') if resource else 'N/A'}")
     return resource
 
 

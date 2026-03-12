@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta
 from aiogram import Router, F, Bot
 from aiogram.types import Message, CallbackQuery
@@ -11,12 +12,14 @@ from keyboards import (
     BTN_BALANCE, BTN_REFERRAL, BTN_INFO, BTN_HELP, BTN_AI, BTN_LANG, BTN_TOTAL, BTN_GET
 )
 from db import (
-    upsert_user, get_user, referral_counts, claim_resource_for_user, decrypt_secret,
-    inc_accounts_taken, create_pending_proof, attach_proof_file, db, set_user_lang
+    upsert_user, get_user, referral_counts, claim_resource_for_user, count_available_resources,
+    decrypt_secret, inc_accounts_taken, create_pending_proof, attach_proof_file, db, set_user_lang
 )
 from join_gate import check_user_joined, current_required_version
 from rate_limit import allow
 from ai import ask_ai
+
+log = logging.getLogger("earnova")
 
 router = Router()
 
@@ -139,9 +142,17 @@ async def get_account(m: Message, bot: Bot):
         await m.answer("❌ তোর পয়েন্ট মাইনাস। আগে পয়েন্ট earn কর, তারপর account নিতে পারবি।")
         return
 
+    avail_before = await count_available_resources()
+    log.info(f"get_account: user={m.from_user.id} available_before_claim={avail_before}")
     r = await claim_resource_for_user(m.from_user.id)
     if not r:
-        await m.answer("এই মুহূর্তে কোনো অ্যাকাউন্ট available নাই 😔")
+        avail_now = await count_available_resources()
+        log.warning(f"get_account: claim returned None for user={m.from_user.id}, available_now={avail_now}")
+        await m.answer(
+            f"😔 এই মুহূর্তে কোনো অ্যাকাউন্ট available নাই।\n"
+            f"(DB count: {avail_now})\n\n"
+            "Admin কে জানাও অথবা পরে আবার চেষ্টা কর।"
+        )
         return
 
     await inc_accounts_taken(m.from_user.id, 1)
