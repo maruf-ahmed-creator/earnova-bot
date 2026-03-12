@@ -238,6 +238,30 @@ async def expire_proof(proof_id: ObjectId):
     )
 
 
+async def free_resource_by_proof(proof: dict):
+    """Release an assigned resource back to available when proof expires."""
+    rid_str = proof.get("resource_id")
+    if not rid_str:
+        return
+    try:
+        oid = ObjectId(rid_str)
+    except Exception:
+        return
+    await db.resources.update_one(
+        {"_id": oid, "status": "assigned"},
+        {"$set": {"status": "available", "assigned_to": None, "assigned_at": None}},
+    )
+
+
+async def reset_all_stuck_resources() -> int:
+    """Admin utility: free all resources stuck in 'assigned' with no active pending proof."""
+    result = await db.resources.update_many(
+        {"status": "assigned"},
+        {"$set": {"status": "available", "assigned_to": None, "assigned_at": None}},
+    )
+    return result.modified_count
+
+
 async def mark_referred_left(referred_id: int):
     now = datetime.utcnow()
     referral = await db.referrals.find_one({"referred_id": referred_id, "left_at": None})

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from datetime import datetime
 from aiogram import Bot
 
 from config import settings
-from db import db, pending_proofs_due, expire_proof, set_banned, mark_referred_left
+from db import db, pending_proofs_due, expire_proof, free_resource_by_proof, set_banned, mark_referred_left
+
+log = logging.getLogger("earnova")
 
 async def proof_timeout_worker(bot: Bot):
     while True:
@@ -13,18 +16,21 @@ async def proof_timeout_worker(bot: Bot):
             due = await pending_proofs_due(datetime.utcnow(), limit=200)
             for p in due:
                 await expire_proof(p["_id"])
+                await free_resource_by_proof(p)
                 uid = int(p["user_id"])
                 await set_banned(uid, True)
+                log.info(f"Auto-banned user {uid} for missing proof. Resource freed.")
                 try:
                     await bot.send_message(
                         settings.PROOF_CHANNEL_PUBLIC,
-                        f"Auto-ban: User {uid} did not submit screenshot in time. Resource={p.get('resource_id')}",
+                        f"Auto-ban: User {uid} did not submit screenshot in time.\nResource={p.get('resource_id')}",
                     )
                 except Exception:
                     pass
-        except Exception:
-            pass
+        except Exception as e:
+            log.exception(f"proof_timeout_worker error: {e}")
         await asyncio.sleep(60)
+
 
 async def referral_leave_worker(bot: Bot):
     while True:
@@ -39,9 +45,10 @@ async def referral_leave_worker(bot: Bot):
                         await mark_referred_left(referred)
                 except Exception:
                     continue
-        except Exception:
-            pass
+        except Exception as e:
+            log.exception(f"referral_leave_worker error: {e}")
         await asyncio.sleep(600)
+
 
 async def broadcast_worker(bot: Bot):
     while True:
@@ -65,6 +72,12 @@ async def broadcast_worker(bot: Bot):
                     failed += 1
                 if (sent + failed) % 25 == 0:
                     await asyncio.sleep(1.2)
-            await db.broadcast_jobs.update_one({"_id": job["_id"]}, {"$set": {"status": "done", "sent": sent, "failed": failed}})
-        except Exception:
+
+            await db.broadcast_jobs.update_one(
+                {"_id": job["_id"]},
+                {"$set": {"status": "done", "sent": sent, "failed": failed}},
+            )
+            log.info(f"Broadcast done: sent={sent}, failed={failed}")
+        except Exception as e:
+            log.exception(f"broadcast_worker error: {e}")
             await asyncio.sleep(10)

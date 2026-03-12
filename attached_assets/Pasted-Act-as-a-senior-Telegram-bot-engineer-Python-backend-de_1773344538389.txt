@@ -1,0 +1,124 @@
+Act as a senior Telegram bot engineer, Python backend debugger, FastAPI expert, MongoDB expert, and QA tester.
+
+I already have an existing Telegram bot project. I do NOT want a fresh unrelated bot idea. I want you to inspect, debug, fix, improve, and test my CURRENT bot project properly.
+
+My bot currently has many serious problems:
+
+1. The bot board / menu / interface is messy and confusing.
+2. Some features do not work at all.
+3. The admin panel / admin flow is too difficult and not user-friendly.
+4. Even I am the admin and I struggle to use it.
+5. If a normal user uses this bot, they will understand even less.
+6. When I add an account, it does not properly appear in the account list.
+7. After clicking "Get Account", it shows:
+   - "There is no account here"
+   - or "Currently no account available"
+   even when I already added accounts.
+8. I want the bot fully fixed, cleaned up, and tested so that no errors appear.
+
+What I want you to do:
+
+PHASE 1 — FULL INSPECTION
+- Inspect the entire current codebase carefully.
+- Find all broken features, bad logic, database save/load issues, route issues, callback issues, admin issues, reply keyboard issues, inline button issues, state issues, and account system issues.
+- Do not guess. Read the actual code and identify the real causes.
+
+PHASE 2 — DIAGNOSIS
+Explain clearly:
+- why the board/menu is confusing
+- why some features do not work
+- why account add is failing or not showing in list
+- why "Get Account" says no account available
+- whether the problem is database save issue, wrong collection field names, wrong query filter, logic mismatch, status flag issue, or callback/action mismatch
+- whether there are broken admin commands or broken handlers
+- whether reply keyboard / inline buttons / callback data are inconsistent
+- whether language system breaks button matching
+- whether required channel verification breaks account delivery
+- whether point checking, ban checking, or account availability logic is incorrectly blocking users
+
+PHASE 3 — FIX EVERYTHING
+I want you to actually fix the project practically:
+- clean up the board/menu structure
+- make the admin panel / admin controls easier and clearer
+- make account add work correctly
+- make account list show correctly
+- make Get Account actually return available accounts correctly
+- fix feature handlers that are broken
+- fix callback_data mismatches
+- fix DB save/read bugs
+- fix state management bugs
+- fix startup and runtime errors
+- simplify the user flow
+- simplify the admin flow
+- improve UX so users and admin can understand it easily
+
+PHASE 4 — TEST EVERYTHING
+After fixing, test the project carefully and verify:
+- admin can add account
+- added account appears in list
+- user can click Get Account and receive account if available
+- no false "no account available" message appears
+- menu buttons work
+- language feature works
+- referral works if already implemented
+- admin panel commands/buttons work
+- no handler crashes
+- no DB insert/read mismatch
+- no route/callback errors
+- no startup errors
+- no obvious logic bugs remain
+
+IMPORTANT REQUIREMENTS
+- Do NOT only explain theory.
+- Do NOT stop at diagnosis.
+- I want the real fixes.
+- Show exactly what code you changed.
+- Show which file each fix belongs to.
+- If needed, refactor parts of the bot to make it cleaner and easier to use.
+- Keep the project practical and maintainable.
+- Make the admin side much easier to use.
+- Make the user side simpler and more understandable.
+- If the current structure is bad, improve it instead of preserving bad design.
+
+ACCOUNT SYSTEM FOCUS
+Please pay special attention to the account system:
+- how accounts are added
+- where accounts are stored
+- how accounts are listed
+- what marks an account as available/unavailable
+- how Get Account queries the database
+- whether account status, default/timed flags, cost, owner/user assignment, or expiration logic are causing the issue
+- whether the account is saved but not shown because of wrong field names
+- whether the account is inserted into one collection but read from another
+- whether list and get-account logic use different conditions
+
+ADMIN UX FOCUS
+Please make admin operations easier:
+- clearer button labels
+- cleaner menus
+- easier account add/remove flow
+- easier channel add/remove flow
+- easier stats reading
+- easier broadcast flow
+- easier point/ban flow
+
+OUTPUT FORMAT I WANT
+1. List of all detected problems
+2. Root cause of each problem
+3. Exact fix for each problem
+4. Corrected code
+5. File-by-file changes
+6. Test results / what was verified
+7. Final improved structure
+8. Any remaining optional improvements
+
+FINAL GOAL
+I want my existing bot to become:
+- cleaner
+- easier to use
+- easier for admin
+- easier for users
+- stable
+- working properly
+- tested
+- with no obvious errors
