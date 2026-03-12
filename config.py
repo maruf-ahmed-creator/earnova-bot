@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     ADMIN_IDS: str = ""
 
     REDIS_URL: Optional[str] = None
-    OPENAI_API_KEY: Optional[str] = None
+    OPENROUTER_API_KEY: Optional[str] = None
 
     REPLIT_DEV_DOMAIN: Optional[str] = None
 

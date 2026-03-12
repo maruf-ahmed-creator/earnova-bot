@@ -1,0 +1,231 @@
+Act as a senior Python, FastAPI, Telegram Bot, MongoDB, and admin-panel engineer.
+
+Build and fully fix my Telegram bot system based on the following requirements. I want a production-style, working, clean, organized bot with proper folder structure, comments, error handling, and deployment guidance for Replit.
+
+IMPORTANT API / SECRET INSTRUCTION:
+- Use an environment variable for AI API access.
+- The AI API key variable name must be: OPENROUTER_API_KEY
+- Do NOT hardcode the API key in source code.
+- Load it securely from Replit Secrets / environment variables.
+- Also use environment variables for BOT_TOKEN, WEBHOOK_BASE, ADMIN_IDS, MONGO_URI, SESSION_SECRET and any other secret values.
+
+PROJECT GOAL:
+Create a Telegram bot with:
+- channel join force verification
+- reply keyboard menu
+- referral and points system
+- AI chat
+- language system (Bangla / English)
+- account delivery system
+- proof submission flow
+- auto-ban logic
+- admin panel / admin controls
+- stats and analytics
+- channel management
+- broadcast system
+
+USER FLOW:
+1. After /start, the bot must force the user to join required channels.
+2. If the user has not joined, they cannot use the bot.
+3. After successful verification, show a permanent Telegram Reply Keyboard (not inline keyboard) with these buttons:
+   - Balance
+   - Referral
+   - Bot Info
+   - Help
+   - Ask AI
+   - Language
+   - Total Users
+   - Get Account
+
+FEATURE DETAILS:
+
+1) Balance
+Show:
+- current points
+- total referrals
+- total accounts taken
+
+2) Referral
+- generate personal invite link
+- when someone joins with referral, referrer gets 10 points
+- if referred user later leaves required channel, deduct 10 points from referrer
+- if referrer points go below 0, that user cannot take new accounts until points are positive again
+
+3) Bot Info
+Show:
+- current bot status
+- total available accounts
+- admin info
+
+4) Help
+Show:
+- rules
+- usage guide
+- how the bot works
+
+5) Ask AI
+- user can ask any question
+- AI replies in the user’s selected language
+- support Bangla and English
+- store AI chat analytics for admin stats
+
+6) Language
+- user can switch between Bangla and English
+- all bot responses should follow selected language
+
+7) Total Users
+- when clicked, show current total users count in a popup/alert-style response if possible, otherwise a message
+
+8) Get Account
+When user clicks Get Account:
+- check user is verified in required channels
+- check user is not banned
+- check user has enough points
+- check available account exists
+- then send account details:
+  - account name
+  - login/number/email/credential
+  - password/secret
+- this account message must auto-delete after 5 minutes
+- below the message show inline buttons:
+  - ✅ Working
+  - ❌ Not Working
+
+PROOF FLOW:
+- after receiving an account, the user must send screenshot proof within 10 minutes
+- if no screenshot is submitted within 10 minutes, auto-ban the user
+- if user submits proof:
+  - store it properly
+  - send proof to proof channels depending on result
+
+PROOF CHANNEL LOGIC:
+Channel 1:
+- Name: Earnova System
+- Username: @earnova_system
+- ID: -1003298647624
+- This channel receives both Working and Not Working proofs
+
+Channel 2:
+- Name: Data
+- ID: -1003169986304
+- Private channel
+- This channel receives only Not Working proofs
+- include user details with the not working proof
+
+CHANNEL LOCK LOGIC:
+- when admin adds a new required channel, the bot should lock usage for users
+- users must join the new channel and pass verification before using bot again
+
+ADMIN SYSTEM REQUIREMENTS:
+I need a working admin panel or admin control system. If a web admin panel is too complex for first version, build a powerful Telegram admin control system first. But clearly structure the code so a web admin panel can be added later.
+
+ADMIN FEATURES:
+
+1) Channel
+- add channel
+- remove channel
+- list channels
+- while adding channel, allow setting where each proof type goes:
+  - working proof channel
+  - not working proof channel
+  - with image / without image behavior if needed
+
+2) Point
+- gift points
+- take points
+Input style:
+(userid)_(set point)_(admin text)
+
+3) Ban
+- ban user
+- unban user
+Input style:
+(userid)
+
+4) Account
+- add account
+- remove account
+Input style:
+(userid/gmail)_(account name)_(set time/default)_(set point)
+Explain and implement:
+- if account is default, it remains available until manually removed
+- if timed, it follows configured behavior
+
+5) Stats
+Admin can see:
+- total users
+- total accounts
+- what accounts exist
+- total channels
+- which proof goes to which channel
+- new users today
+- users who left today
+- bot status
+- AI chat analytics
+
+6) Broadcast
+- send broadcast to all users
+- send to single user manually too
+
+TECHNICAL REQUIREMENTS:
+- Python
+- FastAPI
+- Telegram bot framework (choose the best stable option and explain why: aiogram or python-telegram-bot)
+- MongoDB for storage
+- clean modular architecture
+- proper async handling
+- scheduler/background jobs for auto-delete and auto-ban deadlines
+- webhook-based deployment for Replit
+- logging and debugging support
+- startup should be fast and stable
+- no blocking code during startup
+- handle duplicate secrets / wrong webhook path / broken route issues properly
+
+DATABASE DESIGN:
+Create proper models/collections for:
+- users
+- referrals
+- accounts
+- proofs
+- channels
+- settings
+- bans
+- AI chats / analytics
+- broadcasts / logs if needed
+
+DELIVERABLES:
+I want all of the following:
+
+1. Full project structure
+2. All required files
+3. Complete working code
+4. Environment variable list
+5. Replit setup instructions
+6. MongoDB collection design
+7. Webhook setup instructions
+8. Admin command list
+9. Reply keyboard implementation
+10. Channel verification logic
+11. Referral logic
+12. Account claim + proof workflow
+13. Auto-delete and auto-ban implementation
+14. Language system
+15. AI integration using OPENROUTER_API_KEY from environment variable
+16. Error handling and logging
+17. Step-by-step explanation of how to run and test everything
+
+VERY IMPORTANT:
+- Do not give only theory
+- give exact implementation
+- give corrected production-style code
+- if something needs to be split across multiple files, do it properly
+- clearly explain which code goes in which file
+- if you choose Telegram admin commands instead of a web panel for v1, clearly say so
+- make sure all features actually work together logically
+- avoid placeholder logic unless you clearly label it
+- make the bot stable, maintainable, and deployable
+
+At the end, also provide:
+- a bug-prevention checklist
+- a deployment checklist
+- a testing checklist
