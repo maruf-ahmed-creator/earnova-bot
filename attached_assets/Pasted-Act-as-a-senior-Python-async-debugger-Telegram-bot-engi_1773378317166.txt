@@ -1,0 +1,90 @@
+Act as a senior Python async debugger, Telegram bot engineer, FastAPI expert, and performance optimization engineer.
+
+I have an existing Telegram bot project. I want you to inspect and fix a specific serious issue in the current bot.
+
+Main problem:
+After many API calls or repeated user actions, the bot does not process callback queries immediately. Instead, callbacks get delayed, stacked, or queued, and then many callbacks arrive or execute together at once later.
+
+This creates a very bad user experience.
+
+I want you to inspect the real existing code and find the exact root cause of this callback delay / callback queue / callback flood problem.
+
+Symptoms:
+- After many API calls, callback buttons become slow
+- Sometimes button taps feel ignored at first
+- Later, many callbacks execute together
+- The bot becomes laggy or unresponsive
+- This may affect reply buttons, inline buttons, API-based features, AI features, or account-related actions
+
+Your job:
+
+PHASE 1 — ROOT CAUSE ANALYSIS
+Inspect the real current code and identify whether the callback delay is caused by any of these:
+1. Blocking synchronous code inside async handlers
+2. requests library used inside async flow
+3. time.sleep used anywhere instead of asyncio.sleep
+4. Slow external API calls blocking the event loop
+5. Missing callback.answer() or callback query answered too late
+6. Heavy database queries inside callback handlers
+7. MongoDB query/index problems
+8. Long-running logic inside a callback handler
+9. No timeout on external API calls
+10. Multiple bot instances running at the same time
+11. Webhook and polling conflict
+12. Duplicate handlers
+13. Bad state management
+14. Repeated button presses causing duplicate callback queue
+15. No per-user lock / flood protection
+16. Poor async architecture
+17. Background jobs interfering with callback handling
+18. Callback data mismatch or retry behavior
+
+PHASE 2 — EXPLAIN CLEARLY
+Explain:
+- exactly why callbacks are delayed
+- exactly where the code is causing the delay
+- whether the event loop is being blocked
+- whether API calls are too slow or done in the wrong place
+- whether the bot is processing too much work inside one callback
+- whether callbacks are answered too late
+- whether the same callback can be triggered multiple times before previous processing finishes
+
+PHASE 3 — FIX THE PROBLEM
+Apply practical fixes in the current code:
+- replace blocking code with async-safe code
+- replace requests with httpx.AsyncClient if needed
+- replace time.sleep with asyncio.sleep
+- ensure callback.answer() happens immediately
+- move heavy work out of callback path if needed
+- add proper timeout handling
+- add safe per-user lock if needed
+- prevent duplicate repeated button processing
+- improve DB query efficiency if needed
+- make callback handling fast and responsive
+- keep the bot stable under repeated usage
+
+PHASE 4 — TESTING
+After fixing, verify all of these:
+- callback buttons respond immediately
+- repeated user taps do not break the bot
+- many API calls do not cause callback queue buildup
+- no massive delayed callback burst happens later
+- AI-related features still work
+- account-related features still work
+- no new errors are introduced
+
+IMPORTANT:
+- Do not give theory only
+- inspect the real current code
+- find the exact root cause
+- fix it practically
+- show exactly what files and lines were changed
+- explain every important fix clearly
+- keep the final code production-friendly and maintainable
+
+At the end, provide:
+1. root cause summary
+2. exact fixes applied
+3. code changes file by file
+4. what was tested
+5. any remaining optional optimization suggestions

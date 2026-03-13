@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from datetime import datetime, timedelta
+from typing import Dict
 from aiogram import Router, F, Bot
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import CommandStart
@@ -16,7 +18,7 @@ from db import (
     upsert_user, get_user, referral_counts, claim_resource_for_user, count_available_resources,
     decrypt_secret, inc_accounts_taken, create_pending_proof, attach_proof_file, db, set_user_lang
 )
-from join_gate import check_user_joined, current_required_version
+from join_gate import check_user_joined, current_required_version, invalidate_membership_cache
 from rate_limit import allow
 from ai import ask_ai
 
@@ -24,21 +26,25 @@ log = logging.getLogger("earnova")
 
 router = Router()
 
+# Per-user rate limit for Get Account: stores last claim timestamp
+_get_account_last: Dict[int, float] = {}
+GET_ACCOUNT_COOLDOWN = 30  # seconds between Get Account presses per user
+
 
 async def locked(bot: Bot, m: Message) -> bool:
     uid = m.from_user.id
     try:
         ok, missing, _ = await check_user_joined(bot, uid)
     except Exception as e:
-        log.warning(f"locked() check_user_joined raised exception user={uid}: {e} — treating as OK")
+        log.warning(f"locked() check_user_joined raised: {e} — treating as OK")
         ok, missing = True, 0
 
-    log.info(f"locked(): user={uid} channel_ok={ok} missing_channel={missing}")
+    log.info(f"locked(): user={uid} channel_ok={ok} missing={missing}")
 
     if not ok:
         await m.answer(
             "Please join our required channels first, then send /start\n"
-            f"Missing: {missing}"
+            f"Missing channel ID: {missing}"
         )
         return True
 
@@ -48,7 +54,10 @@ async def locked(bot: Bot, m: Message) -> bool:
     log.info(f"locked(): user={uid} user_ver={user_ver} required_ver={v}")
 
     if user and user_ver != int(v):
-        await m.answer("New channel added. Please /start again to verify membership.")
+        await m.answer(
+            "A new required channel was added.\n"
+            "Please send /start again to continue."
+        )
         return True
 
     return False
@@ -58,6 +67,8 @@ async def locked(bot: Bot, m: Message) -> bool:
 async def start(m: Message, bot: Bot):
     if not allow(m.from_user.id, "start"):
         return
+
+    invalidate_membership_cache(m.from_user.id)
 
     args = (m.text or "").split(maxsplit=1)
     ref = None
@@ -73,7 +84,7 @@ async def start(m: Message, bot: Bot):
 
     ok, _, _ = await check_user_joined(bot, m.from_user.id)
     if not ok:
-        await m.answer("Please join our channel first, then send /start again.")
+        await m.answer("Please join our required channel first, then send /start again.")
         return
 
     v = await current_required_version()
@@ -137,12 +148,12 @@ async def help_(m: Message, bot: Bot):
     if await locked(bot, m):
         return
     await m.answer(
-        "Guide:\n"
-        "1) Join all required channels\n"
-        "2) Press Get Account\n"
-        "3) Select Working or Not Working\n"
-        "4) Send screenshot within 10 minutes\n"
-        "WARNING: No screenshot = auto-ban"
+        "How to use:\n"
+        "1. Join all required channels\n"
+        "2. Press Get Account\n"
+        "3. Select Working or Not Working\n"
+        "4. Send a screenshot within 10 minutes\n\n"
+        "WARNING: Missing screenshot = auto-ban"
     )
 
 
@@ -167,37 +178,50 @@ async def total_users(m: Message, bot: Bot):
 
 @router.message(F.text == BTN_GET)
 async def get_account(m: Message, bot: Bot):
+    uid = m.from_user.id
+
+    # ── Rate limit: one Get Account per 30s per user ──────────────────────────
+    now_ts = time.monotonic()
+    last = _get_account_last.get(uid, 0)
+    wait = GET_ACCOUNT_COOLDOWN - (now_ts - last)
+    if wait > 0:
+        await m.answer(f"Please wait {int(wait)+1}s before requesting another account.")
+        return
+    _get_account_last[uid] = now_ts
+    # ──────────────────────────────────────────────────────────────────────────
+
     if await locked(bot, m):
         return
 
-    user = await get_user(m.from_user.id)
+    user = await get_user(uid)
     if not user:
         await start(m, bot)
         return
     if user.get("banned"):
-        await m.answer("You are banned.")
+        await m.answer("You are banned from using this bot.")
         return
     if int(user.get("points", 0)) < 0:
         await m.answer("Your points are negative. Earn more points first.")
         return
 
-    avail_before = await count_available_resources()
-    log.info(f"get_account: user={m.from_user.id} available_before_claim={avail_before}")
-
-    r = await claim_resource_for_user(m.from_user.id)
+    log.info(f"get_account: user={uid} attempting claim")
+    r = await claim_resource_for_user(uid)
 
     if not r:
         avail_now = await count_available_resources()
-        log.warning(f"get_account: claim returned None for user={m.from_user.id}, available_now={avail_now}")
+        log.warning(f"get_account: no account for user={uid}, DB available={avail_now}")
         await m.answer(
             f"No accounts available right now.\n"
             f"(DB available: {avail_now})\n\n"
-            "Run /res_reset if you are admin, or try again later."
+            "Try again later or contact admin."
         )
+        # Reset rate limit so user can retry immediately
+        _get_account_last.pop(uid, None)
         return
 
-    log.info(f"get_account: SUCCESS user={m.from_user.id} resource={r.get('_id')} name={r.get('name')}")
-    await inc_accounts_taken(m.from_user.id, 1)
+    log.info(f"get_account: SUCCESS user={uid} resource={r.get('_id')} name={r.get('name')}")
+    await inc_accounts_taken(uid, 1)
+
     secret = decrypt_secret(r["secret"])
     sent = await m.answer(
         f"Account: {r['name']}\n"
@@ -206,7 +230,7 @@ async def get_account(m: Message, bot: Bot):
     )
 
     deadline = datetime.utcnow() + timedelta(minutes=10)
-    await create_pending_proof(m.from_user.id, str(r["_id"]), "pending", deadline)
+    await create_pending_proof(uid, str(r["_id"]), "pending", deadline)
     await m.answer("Please verify:", reply_markup=verify_kb(str(r["_id"])))
 
     async def _del_later():
@@ -221,13 +245,14 @@ async def get_account(m: Message, bot: Bot):
 
 @router.callback_query(F.data.startswith("verify:"))
 async def verify(cb: CallbackQuery, bot: Bot):
+    # Answer callback IMMEDIATELY to remove Telegram's loading spinner
+    await cb.answer()
+
     parts = (cb.data or "").split(":")
     if len(parts) != 3:
-        await cb.answer("Invalid", show_alert=True)
         return
     _, status, _rid = parts
     if status not in ("working", "notworking"):
-        await cb.answer("Invalid", show_alert=True)
         return
 
     p = await db.proofs.find_one(
@@ -235,10 +260,10 @@ async def verify(cb: CallbackQuery, bot: Bot):
         sort=[("created_at", -1)]
     )
     if not p:
-        await cb.answer("No pending proof found", show_alert=True)
+        await cb.message.reply("No pending verification found.")
         return
     await db.proofs.update_one({"_id": p["_id"]}, {"$set": {"type": status}})
-    await cb.answer("Verified! Send screenshot within 10 minutes.", show_alert=True)
+    await cb.message.reply("Verified! Please send your screenshot within 10 minutes.")
 
 
 @router.message(F.photo)
@@ -265,14 +290,14 @@ async def photo(m: Message, bot: Bot):
         await bot.send_photo(settings.PROOF_CHANNEL_PUBLIC, file_id, caption=caption)
         posted.append(settings.PROOF_CHANNEL_PUBLIC)
     except Exception as e:
-        log.warning(f"Failed to send proof to PUBLIC channel: {e}")
+        log.warning(f"Failed sending proof to PUBLIC channel: {e}")
 
     if ptype == "notworking":
         try:
             await bot.send_photo(settings.PROOF_CHANNEL_DATA, file_id, caption=caption)
             posted.append(settings.PROOF_CHANNEL_DATA)
         except Exception as e:
-            log.warning(f"Failed to send proof to DATA channel: {e}")
+            log.warning(f"Failed sending proof to DATA channel: {e}")
 
     await db.proofs.update_one({"_id": proof["_id"]}, {"$set": {"posted": posted}})
     await m.answer("Proof received. Thank you!")
@@ -287,7 +312,7 @@ async def ai_mode(m: Message, bot: Bot):
         {"$set": {"until": datetime.utcnow().timestamp() + 60}},
         upsert=True
     )
-    await m.answer("AI mode on. Ask your question now. (60 seconds)")
+    await m.answer("AI mode on. Ask your question now. (60 seconds active)")
 
 
 @router.message(F.text)
@@ -309,6 +334,7 @@ async def any_text(m: Message, bot: Bot):
         await m.answer(ans, parse_mode=None)
         return
 
-    if (m.text or "").strip() in {BTN_BALANCE, BTN_REFERRAL, BTN_INFO, BTN_HELP, BTN_AI, BTN_LANG, BTN_TOTAL, BTN_GET}:
+    known = {BTN_BALANCE, BTN_REFERRAL, BTN_INFO, BTN_HELP, BTN_AI, BTN_LANG, BTN_TOTAL, BTN_GET}
+    if (m.text or "").strip() in known:
         return
     await m.answer("Please use the menu buttons.", reply_markup=main_menu_kb())

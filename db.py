@@ -202,17 +202,23 @@ async def count_available_resources() -> int:
 
 
 async def claim_resource_for_user(user_id: int) -> Optional[dict]:
+    """
+    Atomically claim one available resource.
+    Uses find_one_and_update directly — NO pre-count check to avoid TOCTOU race condition.
+    Returns the claimed resource document or None if nothing available.
+    """
     now = datetime.utcnow()
-    avail = await db.resources.count_documents({"status": "available"})
-    log.info(f"claim_resource_for_user: user={user_id}, available_count={avail}")
-    if avail == 0:
-        return None
     resource = await db.resources.find_one_and_update(
         {"status": "available"},
         {"$set": {"status": "assigned", "assigned_to": user_id, "assigned_at": now}},
         return_document=ReturnDocument.AFTER,
     )
-    log.info(f"claim_resource_for_user: result={'found' if resource else 'None'} id={resource.get('_id') if resource else 'N/A'}")
+    if resource:
+        log.info(f"claim_resource_for_user: SUCCESS user={user_id} id={resource['_id']} name={resource.get('name')}")
+    else:
+        total = await db.resources.count_documents({})
+        avail = await db.resources.count_documents({"status": "available"})
+        log.warning(f"claim_resource_for_user: NONE user={user_id} total_resources={total} available={avail}")
     return resource
 
 
