@@ -51,6 +51,8 @@ async def admin_help(m: Message):
         "/points_give [user_id] [pts] — add points\n"
         "/points_take [user_id] [pts] — remove points\n"
         "/msg [user_id] [text] — DM a user\n\n"
+        "🔍 DEBUG\n"
+        "/debug_db — raw DB dump of all accounts\n\n"
         "📦 ACCOUNT MANAGEMENT\n"
         "/res_add [name] | [secret] — add account\n"
         "  (optional: | [cost] | [1 if default])\n"
@@ -231,6 +233,29 @@ async def msg_user(m: Message):
 
 
 # ─── ACCOUNT MANAGEMENT ────────────────────────────────────────────────────────
+
+@router.message(Command("debug_db"))
+async def debug_db(m: Message):
+    if await deny(m):
+        return
+    total = await db.resources.count_documents({})
+    avail = await db.resources.count_documents({"status": "available"})
+    assigned = await db.resources.count_documents({"status": "assigned"})
+    other = total - avail - assigned
+
+    lines = [f"DB DUMP — resources (total={total})\navailable={avail} assigned={assigned} other={other}\n"]
+    cursor = db.resources.find({}).sort("created_at", -1).limit(10)
+    async for r in cursor:
+        lines.append(
+            f"ID: {r['_id']}\n"
+            f"  Name: {r.get('name')}\n"
+            f"  Status: {r.get('status')}\n"
+            f"  AssignedTo: {r.get('assigned_to')}\n"
+            f"  Cost: {r.get('cost')}\n"
+            f"  Default: {r.get('default_flag')}"
+        )
+    await m.reply("\n\n".join(lines), parse_mode=None)
+
 
 @router.message(Command("res_add"))
 async def res_add(m: Message):
